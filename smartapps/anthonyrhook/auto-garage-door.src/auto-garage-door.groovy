@@ -24,15 +24,16 @@ definition(
     iconX3Url: "http://cdn.device-icons.smartthings.com/Transportation/transportation12-icn@3x.png")
 
 preferences {
-	section("Who's door to open?") {
-    	input "presence", "capability.presenceSensor", title: "presence", required: true, multiple: false 
+	section("Which presence sensor to tie this to?") {
+    	input "presence", "capability.presenceSensor", title: "Who is this for?", required: true, multiple: false
     }
     section("Which garage door is theirs?") {
-        input "garageDoor", "capability.garageDoorControl", required: true, title: "Which Garage Door", multiple: false
+        input "garageDoor", "capability.garageDoorControl", required: true, title: "Which garage door to open?", multiple: false
     }
-    section("What door do you exit the garage from?") {
+    section("Close the garage door when this door opens?") {
     	input "houseDoor", "capability.contactSensor", required: false, title: "Opening this door will close your garage", multiple: false
     }
+
     /*section("Run a routine, too?") {
     log.debug location.helloHome?.getPhrases()*.label
     def actions = location.helloHome?.getPhrases()*.label
@@ -57,18 +58,17 @@ def updated() {
 }
 
 def initialize() {
-	subscribe(presence, "presence", garageOpenerHandler)
-    subscribe(houseDoor, "contact.open", garageCloserHandler)
+	subscribe(presence, "presence", garageToggleHandler)
+  subscribe(houseDoor, "contact.open", garageCloserHandler)
 }
 
-def garageOpenerHandler(evt) {
+def garageToggleHandler(evt) {
   log.debug "garageHandler called: $evt"
   if("present" == evt.value) {
-    log.debug garageDoor
     garageDoor.open()
   }
-  else {
-    console.log "Not opening it, it's $garageDoor.contact"
+  else if ("not present" == evt.value) {
+    garageDoor.close()
   }
  }
 
