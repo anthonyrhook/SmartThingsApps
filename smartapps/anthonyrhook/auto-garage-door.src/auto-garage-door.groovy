@@ -53,7 +53,7 @@ def initialize() {
 }
 
 def garageToggleHandler(evt) {
-	def currentState = garageDoor.garageDoorControl.currentValue("door")
+	def currentState = garageDoor.currentValue("door")
 	log.debug "garageToggleHandler called: $evt"
 
     //Presense detected and the door is closed, open it.
@@ -78,7 +78,7 @@ def garageToggleHandler(evt) {
 }
 
 def garageCloserHandler(evt) {
-	def currentState = garageDoor.garageDoorControl.currentValue("door")
+	def currentState = garageDoor.currentValue("door")
 	log.debug "garageCloserHandler called: $evt"
     if("open" == evt.value && currentState?.value == "open") {
     	log.debug "Welcome home, closing $garageDoor"
@@ -96,7 +96,7 @@ def garageCloserHandler(evt) {
 
 //current bandaid - I'd rather not have it if I don't have to
 def checkDoor() {
-	def currentState = garageDoor.garageDoorControl.currentValue("door")
+	def currentState = garageDoor.currentValue("door")
     log.debug "The garage door is $currentState"
     if (!currentState?.value == "closed" || !currentState?.value) { //attempting to handle the null case
     // if (!currentState.value == "open") {
