@@ -33,16 +33,6 @@ preferences {
     section("Close the garage door when this door opens?") {
     	input "houseDoor", "capability.contactSensor", required: false, title: "Opening this door will close your garage", multiple: false
     }
-
-    /*section("Run a routine, too?") {
-    log.debug location.helloHome?.getPhrases()*.label
-    def actions = location.helloHome?.getPhrases()*.label
-      if (actions) {
-        log.debug "Phrase list found: ${actions}"
-        input "phrase", "enum", title: "Trigger Hello Home Action", required: false, options: phrases
-       }
-       else log.debug "I can't find phrases"
-    }*/
 }
 
 
@@ -59,39 +49,63 @@ def updated() {
 
 def initialize() {
 	subscribe(presence, "presence", garageToggleHandler)
-  subscribe(houseDoor, "contact.open", garageCloserHandler)
+    subscribe(houseDoor, "contact.open", garageCloserHandler)
 }
 
 def garageToggleHandler(evt) {
-  log.debug "garageHandler called: $evt"
-  if("present" == evt.value) {
-    garageDoor.open()
-  }
-  else if ("not present" == evt.value) {
-    garageDoor.close()
-  }
- }
-
-def garageCloserHandler(evt) {
-  log.debug "exitGarageHandler called: $evt"
-  if("open" == evt.value) {
-    log.debug "Contact is in ${evt.value} state"
-    garageDoor.close()
-  }
+	def currentState = garageDoor.doorState
+	log.debug "garageToggleHandler called: $evt"
+    
+    //Presense detected and the door is closed, open it.
+	if("present" == evt.value && currentState?.value == "closed") {
+		log.debug "Welcome home, opening $garageDoor."
+		garageDoor.open()
+	}
+    //No presense and the door is open, close it.
+	else if ("not present" == evt.value && currentState?.value == "open") {
+        log.debug "Bon voyage, closing $garageDoor."
+        garageDoor.close()
+        //Make sure it's closed after 30 seconds
+        //I started checking again after 30 seconds because I was getting inconsistent door states (null)
+        //This is currently a bandaid to go back and check after 30 seconds
+        def now = new Date()
+        def runTime = new Date(now.getTime() + (30 * 1000)) //30 seconds
+        runOnce(runTime, checkDoor)
+  	}
+    else {
+		log.debug "I didn't make any changes."
+	}
 }
 
-/*
-private def changeMode(mode) {
-    myDebug("changeMode: $mode, location.mode = $location.mode, location.modes = $location.modes")
-
-    if (location.mode != mode && location.modes?.find { it.name == mode }) {
-        myTrace("setLocationMode: ${mode}")
-        setLocationMode(mode)
+def garageCloserHandler(evt) {
+	def currentState = garageDoor.doorState
+	log.debug "garageCloserHandler called: $evt"
+    if("open" == evt.value && currentState?.value == "open") {
+    	log.debug "Welcome home, closing $garageDoor"
+        garageDoor.close()
+        //Make sure it's closed after 30 seconds
+        //I started checking again after 30 seconds because I was getting inconsistent door states (null)
+        //This is currently a bandaid to go back and check after 30 seconds
+        def now = new Date()
+        def runTime = new Date(now.getTime() + (30 * 1000)) //30 seconds
+        runOnce(runTime, checkDoor)
     } else {
-        if (location.mode == mode) {
-            myTrace("Mode unchanged. Already set to: ${mode}")
-        } else {
-            myTrace("Mode unchanged. Unable to find defined mode named: ${mode}")
-        }
-    }
-}*/
+		log.debug "I didn't make any changes."
+	}
+}
+
+//current bandaid - I'd rather not have it if I don't have to
+def checkDoor() {
+	def currentState = garageDoor.getState
+    log.debug "The garage door is $currentState"
+    if (!currentState?.value == "closed" || !currentState?.value) { //attempting to handle the null case
+    // if (!currentState.value == "open") {
+   		log.debug "Sorry, your door didn't close the first time. I'm trying again."
+    	garageDoor.close()
+    	def now = new Date()
+		def runTime = new Date(now.getTime() + (30 * 1000)) //30 seconds
+		runOnce(runTime, checkDoor)
+      } else {
+      log.debug "I made sure $garageDoor is closed."
+	}
+}
