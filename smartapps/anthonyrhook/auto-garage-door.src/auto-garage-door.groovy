@@ -24,14 +24,20 @@ definition(
     iconX3Url: "http://cdn.device-icons.smartthings.com/Transportation/transportation12-icn@3x.png")
 
 preferences {
-	section("Which presence sensor to tie this to?") {
-    	input "presence", "capability.presenceSensor", title: "Who is this for?", required: true, multiple: false
+	section("Which sensor is this tied to?") {
+    	input "presence", "capability.presenceSensor", title: "Presence sensors", required: true, multiple: false
     }
     section("Which garage door is theirs?") {
         input "garageDoor", "capability.garageDoorControl", required: true, title: "Which garage door to open?", multiple: false
     }
-    section("Close the garage door when this door opens?") {
-    	input "houseDoor", "capability.contactSensor", required: false, title: "Opening this door will close your garage", multiple: false
+    section("Close the garage door when an interior door opens?") {
+    	input "houseDoor", "capability.contactSensor", required: false, title: "Interior door", multiple: false
+    }
+    section("Send Notifications?") {
+        input("recipients", "contact", title: "Send notifications to") {
+            input "phone", "phone", title: "Notify with text message (optional)",
+                description: "Phone Number", required: false
+        }
     }
 }
 
@@ -53,23 +59,24 @@ def initialize() {
 }
 
 def garageToggleHandler(evt) {
-	def currentState = garageDoor.currentValue("door")
+	
+    def currentState = garageDoor.currentValue("door")
 	log.debug "garageToggleHandler called: $evt"
-
+	log.debug currentState
+    
     //Presense detected and the door is closed, open it.
-	if("present" == evt.value && currentState?.value == "closed") {
+	if("present" == evt.value && currentState == "closed") {
 		log.debug "Welcome home, opening $garageDoor."
 		garageDoor.open()
 	}
     //No presense and the door is open, close it.
-	else if ("not present" == evt.value && currentState?.value == "open") {
+	else if ("not present" == evt.value && currentState == "open") {
         log.debug "Bon voyage, closing $garageDoor."
         garageDoor.close()
-        //Make sure it's closed after 30 seconds
-        //I started checking again after 30 seconds because I was getting inconsistent door states (null)
-        //This is currently a bandaid to go back and check after 30 seconds
+        //Make sure it's closed after 15 seconds
+        //This is currently a bandaid to go back and check after 15 seconds
         def now = new Date()
-        def runTime = new Date(now.getTime() + (30 * 1000)) //30 seconds
+        def runTime = new Date(now.getTime() + (15 * 1000)) //15 seconds
         runOnce(runTime, checkDoor)
   	}
     else {
@@ -80,14 +87,13 @@ def garageToggleHandler(evt) {
 def garageCloserHandler(evt) {
 	def currentState = garageDoor.currentValue("door")
 	log.debug "garageCloserHandler called: $evt"
-    if("open" == evt.value && currentState?.value == "open") {
+    if("open" == evt.value && currentState == "open") {
     	log.debug "Welcome home, closing $garageDoor"
         garageDoor.close()
         //Make sure it's closed after 30 seconds
-        //I started checking again after 30 seconds because I was getting inconsistent door states (null)
-        //This is currently a bandaid to go back and check after 30 seconds
+        //This is currently a bandaid to go back and check after 15 seconds
         def now = new Date()
-        def runTime = new Date(now.getTime() + (30 * 1000)) //30 seconds
+        def runTime = new Date(now.getTime() + (15 * 1000)) //15 seconds
         runOnce(runTime, checkDoor)
     } else {
 		log.debug "I didn't make any changes."
@@ -95,17 +101,26 @@ def garageCloserHandler(evt) {
 }
 
 //current bandaid - I'd rather not have it if I don't have to
+//Maybe I'll refactor this sometime in the future.
 def checkDoor() {
 	def currentState = garageDoor.currentValue("door")
-    log.debug "The garage door is $currentState"
-    if (!currentState?.value == "closed" || !currentState?.value) { //attempting to handle the null case
-    // if (!currentState.value == "open") {
+    //log.debug "The garage door is $currentState"
+    if (currentState == "open") {
    		log.debug "Sorry, your door didn't close the first time. I'm trying again."
     	garageDoor.close()
     	def now = new Date()
-		def runTime = new Date(now.getTime() + (30 * 1000)) //30 seconds
+		def runTime = new Date(now.getTime() + (15 * 1000)) //15 seconds
 		runOnce(runTime, checkDoor)
       } else {
-      log.debug "I made sure $garageDoor is closed."
-	}
+        def message = "$garageDoor is closed"
+        if (location.contactBookEnabled && recipients) {
+            log.debug "contact book enabled!"
+            sendNotificationToContacts(message, recipients)
+        } else {
+            log.debug "contact book not enabled"
+            if (phone) {
+                sendSms(phone, message)
+            }
+        }
+    }
 }
